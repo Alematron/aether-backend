@@ -2,7 +2,12 @@ require("dotenv").config();
 
 const express = require("express");
 const app = express();
-
+app.use((req, res, next) => {
+  if (req.method === "OPTIONS") {
+    console.log("🔥 OPTIONS HIT:", req.path);
+  }
+  next();
+});
 const helmet = require("helmet");
 const cors = require("cors");
 const compression = require("compression");
@@ -18,9 +23,14 @@ const { globalRateLimit } = require("./middleware/rateLimiter");
 // ─────────────────────────────────────────────────────────────
 // REQUEST DEBUG (must be AFTER app init)
 // ─────────────────────────────────────────────────────────────
-app.use((req, res, next) => {
-  console.log("REQ:", req.method, req.path);
-  next();
+app.use(cors(corsOptions));
+
+app.options("*", (req, res) => {
+  res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.sendStatus(204);
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -60,7 +70,14 @@ const corsOptions = {
 // MUST BE FIRST MIDDLEWARE
 // ─────────────────────────────────────────────────────────────
 app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
+app.options("*", cors(corsOptions)); // OR manual handler above
+
+app.use(express.json());
+app.use(express.urlencoded());
+
+app.use(globalRateLimit);
+
+app.use("/api/auth", authRoutes);
 
 // ─────────────────────────────────────────────────────────────
 // SECURITY
