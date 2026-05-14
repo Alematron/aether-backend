@@ -2,12 +2,7 @@ require("dotenv").config();
 
 const express = require("express");
 const app = express();
-app.use((req, res, next) => {
-  if (req.method === "OPTIONS") {
-    console.log("🔥 OPTIONS HIT:", req.path);
-  }
-  next();
-});
+
 const helmet = require("helmet");
 const cors = require("cors");
 const compression = require("compression");
@@ -20,22 +15,19 @@ const logger = require("./utils/logger");
 const errorHandler = require("./middleware/errorHandler");
 const { globalRateLimit } = require("./middleware/rateLimiter");
 
-// ─────────────────────────────────────────────────────────────
-// REQUEST DEBUG (must be AFTER app init)
-// ─────────────────────────────────────────────────────────────
-app.use(cors(corsOptions));
-
-app.options("*", (req, res) => {
-  res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.setHeader("Access-Control-Allow-Credentials", "true");
-  res.sendStatus(204);
+// ─────────────────────────────────────────────
+// DEBUG (MUST BE FIRST)
+// ─────────────────────────────────────────────
+app.use((req, res, next) => {
+  if (req.method === "OPTIONS") {
+    console.log("🔥 OPTIONS:", req.path);
+  }
+  next();
 });
 
-// ─────────────────────────────────────────────────────────────
-// CORS CONFIG
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// CORS
+// ─────────────────────────────────────────────
 
 const allowedOrigins = [
   "https://blueroom.club",
@@ -48,7 +40,7 @@ if (process.env.FRONTEND_URL) {
 }
 
 const corsOptions = {
-  origin: function (origin, callback) {
+  origin: (origin, callback) => {
     console.log("CORS origin:", origin);
 
     if (!origin) return callback(null, true);
@@ -61,48 +53,26 @@ const corsOptions = {
   },
 
   credentials: true,
+
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 
-// ─────────────────────────────────────────────────────────────
-// MUST BE FIRST MIDDLEWARE
-// ─────────────────────────────────────────────────────────────
+// MUST be BEFORE routes
 app.use(cors(corsOptions));
-app.options("*", cors(corsOptions)); // OR manual handler above
 
-app.use(express.json());
-app.use(express.urlencoded());
+// IMPORTANT: explicit preflight support
+app.options("*", cors(corsOptions));
 
-app.use(globalRateLimit);
+// ─────────────────────────────────────────────
+// CORE MIDDLEWARE
+// ─────────────────────────────────────────────
 
-app.use("/api/auth", authRoutes);
-
-// ─────────────────────────────────────────────────────────────
-// SECURITY
-// ─────────────────────────────────────────────────────────────
-
-app.use(
-  helmet({
-    crossOriginResourcePolicy: {
-      policy: "cross-origin",
-    },
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        imgSrc: ["'self'", "data:", process.env.R2_PUBLIC_URL],
-        mediaSrc: ["'self'", process.env.R2_PUBLIC_URL],
-      },
-    },
-  })
-);
-
-// ─────────────────────────────────────────────────────────────
-// GENERAL MIDDLEWARE
-// ─────────────────────────────────────────────────────────────
+app.use(helmet());
 
 app.use(compression());
+
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
@@ -116,9 +86,9 @@ app.use(
 
 app.use(globalRateLimit);
 
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────
 // ROUTES
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────
 
 const authRoutes = require("./routes/auth");
 const userRoutes = require("./routes/users");
@@ -146,15 +116,15 @@ app.use("/api/media", mediaRoutes);
 app.use("/api/remixes", remixRoutes);
 app.use("/api/discover", discoverRoutes);
 
-// ─────────────────────────────────────────────────────────────
-// ERROR HANDLER (MUST BE LAST)
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// ERROR HANDLER (LAST)
+// ─────────────────────────────────────────────
 
 app.use(errorHandler);
 
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────
 // START SERVER
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────
 
 async function start() {
   try {
