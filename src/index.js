@@ -38,7 +38,9 @@ if (process.env.FRONTEND_URL) {
 }
 
 const corsOptions = {
-  origin: (origin, callback) => {
+  origin: function (origin, callback) {
+    console.log("CORS origin:", origin);
+
     if (!origin) return callback(null, true);
 
     if (allowedOrigins.includes(origin)) {
@@ -49,12 +51,9 @@ const corsOptions = {
   },
 
   credentials: true,
-
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 
   allowedHeaders: ["Content-Type", "Authorization"],
-
-  optionsSuccessStatus: 200,
 };
 
 // ─────────────────────────────────────────────────────────────
