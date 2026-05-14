@@ -1,5 +1,8 @@
 require("dotenv").config();
-
+app.use((req, res, next) => {
+  console.log("REQ:", req.method, req.path);
+  next();
+});
 const express = require("express");
 const helmet = require("helmet");
 const cors = require("cors");
