@@ -128,8 +128,9 @@ app.use(errorHandler);
 
 async function start() {
   try {
-    await connectDB();
-    await connectRedis();
+    // TEMP DEBUG: disable external services
+    // await connectDB();
+    // await connectRedis();
 
     const port = process.env.PORT || 3000;
 
