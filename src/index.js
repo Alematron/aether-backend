@@ -18,16 +18,6 @@ const logger = require("./utils/logger");
 const errorHandler = require("./middleware/errorHandler");
 const { globalRateLimit } = require("./middleware/rateLimiter");
 
-// Routes
-const authRoutes = require("./routes/auth");
-const userRoutes = require("./routes/users");
-const postRoutes = require("./routes/posts");
-const feedRoutes = require("./routes/feed");
-const communityRoutes = require("./routes/communities");
-const mediaRoutes = require("./routes/media");
-const remixRoutes = require("./routes/remixes");
-const discoverRoutes = require("./routes/discover");
-
 // ─────────────────────────────────────────────────────────────
 // CORS CONFIG
 // ─────────────────────────────────────────────────────────────
@@ -77,6 +67,16 @@ app.use(cors(corsOptions));
 
 // Handle preflight requests
 app.options("*", cors(corsOptions));
+
+// Routes
+const authRoutes = require("./routes/auth");
+const userRoutes = require("./routes/users");
+const postRoutes = require("./routes/posts");
+const feedRoutes = require("./routes/feed");
+const communityRoutes = require("./routes/communities");
+const mediaRoutes = require("./routes/media");
+const remixRoutes = require("./routes/remixes");
+const discoverRoutes = require("./routes/discover");
 
 // ─────────────────────────────────────────────────────────────
 // SECURITY
