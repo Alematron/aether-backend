@@ -8,6 +8,7 @@ const morgan = require("morgan");
 
 const { connectDB } = require("./db/pool");
 const { connectRedis } = require("./services/redis");
+
 const logger = require("./utils/logger");
 const errorHandler = require("./middleware/errorHandler");
 const { globalRateLimit } = require("./middleware/rateLimiter");
@@ -24,51 +25,104 @@ const discoverRoutes = require("./routes/discover");
 
 const app = express();
 
-// ─── CORS ────────────────────────────────────────────────────────────────
-const corsOptions = {
-  origin: function (origin, callback) {
-    const allowed = [
-      "https://blueroom.club",
-      "https://www.blueroom.club",
-      "http://localhost:3000",
-      process.env.FRONTEND_URL,
-    ].filter(Boolean);
+// ─────────────────────────────────────────────────────────────
+// CORS CONFIG
+// ─────────────────────────────────────────────────────────────
 
-    if (!origin || allowed.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
+const allowedOrigins = [
+  "https://blueroom.club",
+  "https://www.blueroom.club",
+  "http://localhost:3000",
+];
+
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+}
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    console.log("Incoming Origin:", origin);
+
+    // Allow Postman / server-side requests
+    if (!origin) {
+      return callback(null, true);
     }
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error("CORS not allowed"));
   },
 
   credentials: true,
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+
+  methods: [
+    "GET",
+    "POST",
+    "PUT",
+    "PATCH",
+    "DELETE",
+    "OPTIONS",
+  ],
+
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+  ],
+
   optionsSuccessStatus: 200,
 };
 
+// IMPORTANT: CORS MUST BE FIRST
 app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
 
-// ─── Security Middleware ────────────────────────────────────────────────
+// Handle preflight requests
+app.options(/.*/, cors(corsOptions));
+
+// ─────────────────────────────────────────────────────────────
+// SECURITY
+// ─────────────────────────────────────────────────────────────
+
 app.use(
   helmet({
-    crossOriginResourcePolicy: { policy: "cross-origin" },
+    crossOriginResourcePolicy: {
+      policy: "cross-origin",
+    },
 
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        imgSrc: ["'self'", "data:", process.env.R2_PUBLIC_URL],
-        mediaSrc: ["'self'", process.env.R2_PUBLIC_URL],
+
+        imgSrc: [
+          "'self'",
+          "data:",
+          process.env.R2_PUBLIC_URL,
+        ],
+
+        mediaSrc: [
+          "'self'",
+          process.env.R2_PUBLIC_URL,
+        ],
       },
     },
   })
 );
 
+// ─────────────────────────────────────────────────────────────
+// GENERAL MIDDLEWARE
+// ─────────────────────────────────────────────────────────────
+
 app.use(compression());
 
 app.use(express.json({ limit: "1mb" }));
-app.use(express.urlencoded({ extended: true, limit: "1mb" }));
+
+app.use(
+  express.urlencoded({
+    extended: true,
+    limit: "1mb",
+  })
+);
 
 app.use(
   morgan("combined", {
@@ -80,7 +134,10 @@ app.use(
 
 app.use(globalRateLimit);
 
-// ─── Health Check ───────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// HEALTH CHECK
+// ─────────────────────────────────────────────────────────────
+
 app.get("/health", (req, res) => {
   res.json({
     status: "ok",
@@ -89,7 +146,10 @@ app.get("/health", (req, res) => {
   });
 });
 
-// ─── API Routes ─────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// API ROUTES
+// ─────────────────────────────────────────────────────────────
+
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/posts", postRoutes);
@@ -99,22 +159,33 @@ app.use("/api/media", mediaRoutes);
 app.use("/api/remixes", remixRoutes);
 app.use("/api/discover", discoverRoutes);
 
-// ─── Error Handler ──────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// ERROR HANDLER
+// ─────────────────────────────────────────────────────────────
+
 app.use(errorHandler);
 
-// ─── Boot ───────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// START SERVER
+// ─────────────────────────────────────────────────────────────
+
 async function start() {
   try {
     await connectDB();
+
     await connectRedis();
 
     const port = process.env.PORT || 3000;
 
     app.listen(port, () => {
       logger.info(`ÆTHER API running on port ${port}`);
+      console.log(`Server running on port ${port}`);
     });
   } catch (err) {
     logger.error("Failed to start server:", err);
+
+    console.error(err);
+
     process.exit(1);
   }
 }
