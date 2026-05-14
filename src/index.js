@@ -23,23 +23,13 @@ const discoverRoutes = require("./routes/discover");
 
 const app = express();
 
-// ─── Security Middleware ───────────────────────────────────────────────────
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" },
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", process.env.R2_PUBLIC_URL],
-      mediaSrc: ["'self'", process.env.R2_PUBLIC_URL],
-    },
-  },
-}));
-
-app.use(cors({
+// ─── CORS (must be first) ──────────────────────────────────────────────────
+const corsOptions = {
   origin: function(origin, callback) {
     const allowed = [
       'https://blueroom.club',
       'https://www.blueroom.club',
+      'http://localhost:3000',
       process.env.FRONTEND_URL,
     ].filter(Boolean)
     if (!origin || allowed.includes(origin)) {
@@ -51,8 +41,23 @@ app.use(cors({
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
+  optionsSuccessStatus: 200,
+}
+
+app.options('*', cors(corsOptions))
+app.use(cors(corsOptions))
+
+// ─── Security Middleware ───────────────────────────────────────────────────
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", process.env.R2_PUBLIC_URL],
+      mediaSrc: ["'self'", process.env.R2_PUBLIC_URL],
+    },
+  },
 }));
-app.options('*', cors())
 
 app.use(compression());
 app.use(express.json({ limit: "1mb" }));
