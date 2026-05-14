@@ -46,6 +46,9 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json());
+app.options("*", (req, res) => {
+  res.sendStatus(200);
+});
 // ─── CORS (must be first) ──────────────────────────────────────────────────
 const corsOptions = {
   origin: function(origin, callback) {
