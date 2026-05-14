@@ -41,22 +41,19 @@ if (process.env.FRONTEND_URL) {
 
 const corsOptions = {
   origin: (origin, callback) => {
-    console.log("Incoming Origin:", origin);
+    if (!origin) return callback(null, true);
 
-    // Allow Postman / server-side requests
-    if (!origin) {
+    const normalizedOrigin = origin.replace(/\/$/, "");
+
+    if (allowedOrigins.includes(normalizedOrigin)) {
       return callback(null, true);
     }
 
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-
-    return callback(new Error("CORS not allowed"));
+    return callback(null, false);
   },
 
   credentials: true,
-
+};
   methods: [
     "GET",
     "POST",
@@ -78,7 +75,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // Handle preflight requests
-app.options(/.*/, cors(corsOptions));
+app.options("*", cors(corsOptions));
 
 // ─────────────────────────────────────────────────────────────
 // SECURITY
