@@ -40,14 +40,20 @@ if (process.env.FRONTEND_URL) {
 }
 
 const corsOptions = {
-  origin: (origin, callback) => {
+  origin: function (origin, callback) {
+    console.log("CORS origin:", origin);
+
     if (!origin) return callback(null, true);
 
-    if (allowedOrigins.includes(Origin)) {
+    if (
+      origin === "https://blueroom.club" ||
+      origin === "https://www.blueroom.club"
+    ) {
       return callback(null, true);
     }
 
-    return callback(null, false);
+    // TEMP: allow all for debugging
+    return callback(null, true);
   },
 
   credentials: true,
@@ -66,7 +72,7 @@ const corsOptions = {
     "Authorization",
   ],
 
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
 };
 
 // IMPORTANT: CORS MUST BE FIRST
