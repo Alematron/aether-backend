@@ -3,7 +3,11 @@ const logger = require("../utils/logger");
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+  ssl: process.env.DATABASE_URL?.includes('railway') 
+    ? { rejectUnauthorized: false }
+    : process.env.NODE_ENV === "production" 
+      ? { rejectUnauthorized: false } 
+      : false,
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
@@ -20,7 +24,6 @@ async function connectDB() {
   logger.info("PostgreSQL connected");
 }
 
-// Thin query wrapper — logs slow queries in dev
 async function query(text, params) {
   const start = Date.now();
   const result = await pool.query(text, params);
