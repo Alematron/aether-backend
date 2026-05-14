@@ -2,10 +2,7 @@ require("dotenv").config();
 
 const express = require("express");
 const app = express();
-app.use((req, res, next) => {
-  console.log("REQ:", req.method, req.path);
-  next();
-});
+
 const helmet = require("helmet");
 const cors = require("cors");
 const compression = require("compression");
@@ -17,6 +14,14 @@ const { connectRedis } = require("./services/redis");
 const logger = require("./utils/logger");
 const errorHandler = require("./middleware/errorHandler");
 const { globalRateLimit } = require("./middleware/rateLimiter");
+
+// ─────────────────────────────────────────────────────────────
+// REQUEST DEBUG (must be AFTER app init)
+// ─────────────────────────────────────────────────────────────
+app.use((req, res, next) => {
+  console.log("REQ:", req.method, req.path);
+  next();
+});
 
 // ─────────────────────────────────────────────────────────────
 // CORS CONFIG
@@ -45,38 +50,18 @@ const corsOptions = {
 
   credentials: true,
 
-  methods: [
-    "GET",
-    "POST",
-    "PUT",
-    "PATCH",
-    "DELETE",
-    "OPTIONS",
-  ],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 
-  allowedHeaders: [
-    "Content-Type",
-    "Authorization",
-  ],
+  allowedHeaders: ["Content-Type", "Authorization"],
 
   optionsSuccessStatus: 200,
 };
 
-// IMPORTANT: CORS MUST BE FIRST
+// ─────────────────────────────────────────────────────────────
+// MUST BE FIRST MIDDLEWARE
+// ─────────────────────────────────────────────────────────────
 app.use(cors(corsOptions));
-
-// Handle preflight requests
 app.options("*", cors(corsOptions));
-
-// Routes
-const authRoutes = require("./routes/auth");
-const userRoutes = require("./routes/users");
-const postRoutes = require("./routes/posts");
-const feedRoutes = require("./routes/feed");
-const communityRoutes = require("./routes/communities");
-const mediaRoutes = require("./routes/media");
-const remixRoutes = require("./routes/remixes");
-const discoverRoutes = require("./routes/discover");
 
 // ─────────────────────────────────────────────────────────────
 // SECURITY
@@ -87,21 +72,11 @@ app.use(
     crossOriginResourcePolicy: {
       policy: "cross-origin",
     },
-
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-
-        imgSrc: [
-          "'self'",
-          "data:",
-          process.env.R2_PUBLIC_URL,
-        ],
-
-        mediaSrc: [
-          "'self'",
-          process.env.R2_PUBLIC_URL,
-        ],
+        imgSrc: ["'self'", "data:", process.env.R2_PUBLIC_URL],
+        mediaSrc: ["'self'", process.env.R2_PUBLIC_URL],
       },
     },
   })
@@ -112,15 +87,8 @@ app.use(
 // ─────────────────────────────────────────────────────────────
 
 app.use(compression());
-
 app.use(express.json({ limit: "1mb" }));
-
-app.use(
-  express.urlencoded({
-    extended: true,
-    limit: "1mb",
-  })
-);
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
 app.use(
   morgan("combined", {
@@ -133,8 +101,17 @@ app.use(
 app.use(globalRateLimit);
 
 // ─────────────────────────────────────────────────────────────
-// HEALTH CHECK
+// ROUTES
 // ─────────────────────────────────────────────────────────────
+
+const authRoutes = require("./routes/auth");
+const userRoutes = require("./routes/users");
+const postRoutes = require("./routes/posts");
+const feedRoutes = require("./routes/feed");
+const communityRoutes = require("./routes/communities");
+const mediaRoutes = require("./routes/media");
+const remixRoutes = require("./routes/remixes");
+const discoverRoutes = require("./routes/discover");
 
 app.get("/health", (req, res) => {
   res.json({
@@ -143,10 +120,6 @@ app.get("/health", (req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
-
-// ─────────────────────────────────────────────────────────────
-// API ROUTES
-// ─────────────────────────────────────────────────────────────
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
@@ -158,7 +131,7 @@ app.use("/api/remixes", remixRoutes);
 app.use("/api/discover", discoverRoutes);
 
 // ─────────────────────────────────────────────────────────────
-// ERROR HANDLER
+// ERROR HANDLER (MUST BE LAST)
 // ─────────────────────────────────────────────────────────────
 
 app.use(errorHandler);
@@ -170,7 +143,6 @@ app.use(errorHandler);
 async function start() {
   try {
     await connectDB();
-
     await connectRedis();
 
     const port = process.env.PORT || 3000;
@@ -181,9 +153,7 @@ async function start() {
     });
   } catch (err) {
     logger.error("Failed to start server:", err);
-
     console.error(err);
-
     process.exit(1);
   }
 }
