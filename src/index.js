@@ -46,7 +46,7 @@ const corsOptions = {
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
 
-    if (allowedOrigins.includes(Origin)) {
+    if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
 
@@ -69,7 +69,7 @@ const corsOptions = {
     "Authorization",
   ],
 
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
 };
 
 // IMPORTANT: CORS MUST BE FIRST
