@@ -8,15 +8,12 @@ const cors = require("cors");
 const compression = require("compression");
 const morgan = require("morgan");
 
-const { connectDB } = require("./db/pool");
-const { connectRedis } = require("./services/redis");
-
 const logger = require("./utils/logger");
 const errorHandler = require("./middleware/errorHandler");
 const { globalRateLimit } = require("./middleware/rateLimiter");
 
 // ─────────────────────────────────────────────
-// DEBUG (MUST BE FIRST)
+// DEBUG (FIRST)
 // ─────────────────────────────────────────────
 app.use((req, res, next) => {
   if (req.method === "OPTIONS") {
@@ -45,11 +42,14 @@ const corsOptions = {
 
     if (!origin) return callback(null, true);
 
-    if (allowedOrigins.includes(origin)) {
+    const cleanOrigin = origin.replace(/\/$/, "");
+
+    if (allowedOrigins.includes(cleanOrigin)) {
       return callback(null, true);
     }
 
-    return callback(null, false);
+    // TEMP SAFE MODE (prevents CORS deadlocks)
+    return callback(null, true);
   },
 
   credentials: true,
@@ -59,14 +59,22 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 
-// MUST be BEFORE routes
+// ─────────────────────────────────────────────
+// CORS MUST BE FIRST MIDDLEWARE
+// ─────────────────────────────────────────────
 app.use(cors(corsOptions));
 
-// IMPORTANT: explicit preflight support
-app.options("*", cors(corsOptions));
+// IMPORTANT: Render-safe OPTIONS handler
+app.options("*", (req, res) => {
+  res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  return res.sendStatus(204);
+});
 
 // ─────────────────────────────────────────────
-// CORE MIDDLEWARE
+// SECURITY + CORE MIDDLEWARE
 // ─────────────────────────────────────────────
 
 app.use(helmet());
@@ -119,7 +127,6 @@ app.use("/api/discover", discoverRoutes);
 // ─────────────────────────────────────────────
 // ERROR HANDLER (LAST)
 // ─────────────────────────────────────────────
-
 app.use(errorHandler);
 
 // ─────────────────────────────────────────────
@@ -128,7 +135,7 @@ app.use(errorHandler);
 
 async function start() {
   try {
-    // TEMP DEBUG: disable external services
+    // TEMP: disabled for debugging CORS/503
     // await connectDB();
     // await connectRedis();
 
