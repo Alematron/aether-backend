@@ -1,5 +1,4 @@
 require("dotenv").config();
-const express = require("express");
 const helmet = require("helmet");
 const cors = require("cors");
 const compression = require("compression");
@@ -20,10 +19,8 @@ const communityRoutes = require("./routes/communities");
 const mediaRoutes = require("./routes/media");
 const remixRoutes = require("./routes/remixes");
 const discoverRoutes = require("./routes/discover");
-
-const app = express();
 const express = require("express");
-
+const app = express();
 const app = express();
 
 app.use((req, res, next) => {
