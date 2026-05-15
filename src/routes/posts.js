@@ -130,7 +130,76 @@ router.delete("/:id", authenticate, async (req, res, next) => {
     next(err);
   }
 });
+// ── PATCH /api/posts/:id ──────────────────────────────────────────────────
+router.patch("/:id",
+  authenticate,
+  [
+    body("content").optional().isString().isLength({ max: 2000 }),
+    body("visibility").optional().isIn(["public", "followers", "community", "private"]),
+    body("tags").optional().isArray({ max: 10 }),
+    body("aesthetics").optional().isArray({ max: 5 }),
+    body("isNsfw").optional().isBoolean(),
+  ],
+  async (req, res, next) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
+      const { content, visibility, tags, aesthetics, isNsfw } = req.body;
+
+      // Check ownership
+      const { rows: postRows } = await query(
+        `SELECT user_id FROM posts WHERE id = $1`, [req.params.id]
+      );
+      if (!postRows.length) return res.status(404).json({ error: "Post not found" });
+      if (postRows[0].user_id !== req.user.id && req.user.role === "user") {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      // Build dynamic update
+      const updates = [];
+      const values = [];
+      let paramCount = 1;
+
+      if (content !== undefined) {
+        updates.push(`content = $${paramCount++}`);
+        values.push(content);
+      }
+      if (visibility !== undefined) {
+        updates.push(`visibility = $${paramCount++}`);
+        values.push(visibility);
+      }
+      if (tags !== undefined) {
+        updates.push(`tags = $${paramCount++}`);
+        values.push(tags);
+      }
+      if (aesthetics !== undefined) {
+        updates.push(`aesthetics = $${paramCount++}`);
+        values.push(aesthetics);
+      }
+      if (isNsfw !== undefined) {
+        updates.push(`is_nsfw = $${paramCount++}`);
+        values.push(isNsfw);
+      }
+
+      if (!updates.length) {
+        return res.status(400).json({ error: "No fields to update" });
+      }
+
+      updates.push(`updated_at = NOW()`);
+      values.push(req.params.id);
+
+      const { rows } = await query(
+        `UPDATE posts SET ${updates.join(", ")} WHERE id = $${paramCount} RETURNING *`,
+        values
+      );
+
+      res.json(rows[0]);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 // ── POST /api/posts/:id/like ───────────────────────────────────────────────
 router.post("/:id/like", authenticate, async (req, res, next) => {
   try {
