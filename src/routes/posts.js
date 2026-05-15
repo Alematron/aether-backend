@@ -107,7 +107,50 @@ router.post("/",
     }
   }
 );
+// ── PATCH /api/posts/:id ───────────────────────────────────────────────────
+router.patch("/:id",
+  authenticate,
+  [
+    body("content").optional().isString().isLength({ max: 2000 }),
+    body("tags").optional().isArray({ max: 10 }),
+    body("mediaKeys").optional().isArray({ max: 10 }),
+  ],
+  async (req, res, next) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
+      const { rows } = await query(
+        `SELECT user_id FROM posts WHERE id = $1`, [req.params.id]
+      );
+      if (!rows.length) return res.status(404).json({ error: "Not found" });
+      if (rows[0].user_id !== req.user.id) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const { content, tags, mediaKeys } = req.body;
+      const updates = [];
+      const values = [];
+      let i = 1;
+
+      if (content !== undefined) { updates.push('content = $' + i++); values.push(content); }
+      if (tags !== undefined) { updates.push('tags = $' + i++); values.push(tags); }
+      if (mediaKeys !== undefined) { updates.push('media_keys = $' + i++); values.push(mediaKeys); }
+
+      if (!updates.length) return res.status(400).json({ error: "Nothing to update" });
+
+      values.push(req.params.id);
+      const { rows: updated } = await query(
+        'UPDATE posts SET ' + updates.join(', ') + ' WHERE id = $' + i + ' RETURNING *',
+        values
+      );
+
+      res.json(updated[0]);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 // ── DELETE /api/posts/:id ──────────────────────────────────────────────────
 router.delete("/:id", authenticate, async (req, res, next) => {
   try {
