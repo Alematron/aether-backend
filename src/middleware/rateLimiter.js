@@ -16,8 +16,6 @@ const authRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many auth attempts. Try again in 15 minutes." },
-  keyGenerator: (req) =>
-    req.headers["x-forwarded-for"]?.split(",")[0] || req.ip,
 });
 
 // For media uploads
