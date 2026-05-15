@@ -72,28 +72,71 @@ router.post("/",
         return res.status(400).json({ error: "Post must have content or media" });
       }
 
-      const { rows } = await transaction(async (client) => {
-        const post = await client.query(
-          `INSERT INTO posts
-             (user_id, content, post_type, visibility, tags, aesthetics,
-              media_keys, media_meta, community_id, is_nsfw)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-           RETURNING *`,
-          [req.user.id, content, postType, visibility,
-           tags, aesthetics, mediaKeys, mediaMeta, communityId, isNsfw]
-        );
-        await client.query(
-          `UPDATE users SET post_count = post_count + 1 WHERE id = $1`,
-          [req.user.id]
-        );
-        if (communityId) {
-          await client.query(
-            `UPDATE communities SET post_count = post_count + 1 WHERE id = $1`,
-            [communityId]
-          );
-        }
-        return post.rows;
-      });
+      router.post("/",
+  authenticate,
+  [
+    body("content").optional().isString().isLength({ max: 2000 }),
+    body("postType").optional().isIn(["text", "image", "audio", "video", "collage"]),
+    body("visibility").optional().isIn(["public", "followers", "community", "private"]),
+    body("tags").optional().isArray({ max: 10 }),
+    body("aesthetics").optional().isArray({ max: 5 }),
+    body("mediaKeys").optional().isArray({ max: 10 }),
+    body("communityId").optional().isUUID(),
+    body("isNsfw").optional().isBoolean(),
+  ],
+  async (req, res, next) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+      const {
+        content,
+        postType = "text",
+        visibility = "public",
+        tags = [],
+        aesthetics = [],
+        mediaKeys = [],
+        mediaMeta = {},
+        communityId = null,
+        isNsfw = false,
+      } = req.body;
+
+      if (!content && !mediaKeys.length) {
+        return res.status(400).json({ error: "Post must have content or media" });
+      }
+
+      const result = await query(
+        `INSERT INTO posts
+           (user_id, content, post_type, visibility, tags, aesthetics,
+            media_keys, media_meta, community_id, is_nsfw)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+         RETURNING *`,
+        [req.user.id, content, postType, visibility,
+         tags, aesthetics, mediaKeys, mediaMeta, communityId, isNsfw]
+      );
+
+      const post = result.rows[0];
+
+      await query(
+        `UPDATE users SET post_count = post_count + 1 WHERE id = $1`,
+        [req.user.id]
+      );
+
+      if (communityId) {
+        await query(
+          `UPDATE communities SET post_count = post_count + 1 WHERE id = $1`,
+          [communityId]
+        ).catch(() => {});
+      }
+
+      scorePost(post).catch(() => {});
+
+      res.status(201).json(post);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
       // Async: compute initial score & fan out to followers' feeds
       scorePost(rows[0]).catch(() => {});
