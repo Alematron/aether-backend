@@ -121,7 +121,7 @@ router.patch("/:id",
       if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
       const { rows } = await query(
-        `SELECT user_id FROM posts WHERE id = $1`, [req.params.id]
+        'SELECT user_id FROM posts WHERE id = $1', [req.params.id]
       );
       if (!rows.length) return res.status(404).json({ error: "Not found" });
       if (rows[0].user_id !== req.user.id) {
