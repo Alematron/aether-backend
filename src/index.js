@@ -1,9 +1,11 @@
 require("dotenv").config();
 
-const express = require("express");
 const app = express();
 
+app.set('trust proxy', 1);
+
 const helmet = require("helmet");
+// ... rest of middleware
 const cors = require("cors");
 const compression = require("compression");
 const morgan = require("morgan");
