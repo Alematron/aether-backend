@@ -49,7 +49,7 @@ router.post("/",
   authenticate,
   [
     body("content").optional().isString().isLength({ max: 2000 }),
-    body("postType").isIn(["text", "image", "audio", "video", "collage"]),
+   body("postType").optional().isIn(["text", "image", "audio", "video", "collage"]),
     body("visibility").optional().isIn(["public", "followers", "community", "private"]),
     body("tags").optional().isArray({ max: 10 }),
     body("aesthetics").optional().isArray({ max: 5 }),
