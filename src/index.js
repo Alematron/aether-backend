@@ -63,7 +63,8 @@ const corsOptions = {
 // ─────────────────────────────────────────────
 // CORS MUST BE FIRST MIDDLEWARE
 // ─────────────────────────────────────────────
-app.use(cors(corsOptions));
+app.options('*', cors(corsOptions))
+app.use(cors(corsOptions))
 
 // IMPORTANT: Render-safe OPTIONS handler
 app.options("*", (req, res) => {
