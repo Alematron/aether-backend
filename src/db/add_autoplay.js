@@ -1,41 +1,18 @@
-import { create } from 'zustand'
-import {
-  getUser as getStoredUser,
-  setUser as setStoredUser,
-  clearTokens,
-} from '../lib/api'
+require("dotenv").config();
+const { pool } = require("../db/pool");
 
-const useAuthStore = create(function(set) {
-  return {
-    user: null,
-    initialized: false,
-
-    init() {
-      const user = getStoredUser()
-
-      set({
-        user,
-        initialized: true,
-      })
-    },
-
-    setUser(user) {
-      setStoredUser(user)
-
-      set({
-        user,
-      })
-    },
-
-    logout() {
-      clearTokens()
-
-      set({
-        user: null,
-        initialized: true,
-      })
-    },
+async function addAutoplay() {
+  console.log("Adding autoplay column...");
+  try {
+    await pool.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS room_autoplay VARCHAR(16) DEFAULT 'none';
+    `);
+    console.log("Done!");
+  } catch (err) {
+    console.error("Failed:", err.message);
+  } finally {
+    await pool.end();
   }
-})
+}
 
-export default useAuthStore
+addAutoplay();
