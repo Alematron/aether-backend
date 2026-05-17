@@ -11,6 +11,12 @@ const SCHEMA = `
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pg_trgm";  -- fuzzy search on tags/aesthetics
 
+-- ── BEDROOM / PROFILE CUSTOMIZATION ──────────────────────────────────────
+ALTER TABLE users ADD COLUMN IF NOT EXISTS room_theme VARCHAR(64) DEFAULT 'void';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS room_wallpaper_key VARCHAR(512);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS room_accent_color VARCHAR(16) DEFAULT '#c084fc';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS room_mood VARCHAR(128);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS room_mood_emoji VARCHAR(8) DEFAULT '🌙';
 -- ──────────────────────────────────────────────
 -- USERS
 -- Pseudonymous-first: no real name required ever.
