@@ -123,5 +123,75 @@ async function refreshSpotifyToken(refreshToken, handle) {
     return tokens.access_token;
   } catch { return null; }
 }
+router.get("/token", authenticate, async (req, res) => {
+  try {
+    const { rows } = await query(
+      "SELECT spotify_access_token, spotify_refresh_token, spotify_token_expires FROM users WHERE id = $1",
+      [req.user.id]
+    );
+    if (!rows.length || !rows[0].spotify_access_token) {
+      return res.status(401).json({ error: "Not connected to Spotify" });
+    }
+    let token = rows[0].spotify_access_token;
+    if (new Date() > new Date(rows[0].spotify_token_expires)) {
+      token = await refreshSpotifyToken(rows[0].spotify_refresh_token, req.user.id);
+      if (!token) return res.status(401).json({ error: "Token refresh failed" });
+    }
+    res.json({ token });
+  } catch (err) {
+    next(err);
+  }
+});
 
+router.get("/playlists", authenticate, async (req, res) => {
+  try {
+    const { rows } = await query(
+      "SELECT spotify_access_token, spotify_token_expires, spotify_refresh_token FROM users WHERE id = $1",
+      [req.user.id]
+    );
+    if (!rows.length || !rows[0].spotify_access_token) {
+      return res.status(401).json({ error: "Not connected" });
+    }
+    let token = rows[0].spotify_access_token;
+    if (new Date() > new Date(rows[0].spotify_token_expires)) {
+      token = await refreshSpotifyToken(rows[0].spotify_refresh_token, req.user.id);
+    }
+    const response = await fetch("https://api.spotify.com/v1/me/playlists?limit=20", {
+      headers: { Authorization: "Bearer " + token },
+    });
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch playlists" });
+  }
+});
+
+router.put("/play", authenticate, async (req, res) => {
+  try {
+    const { rows } = await query(
+      "SELECT spotify_access_token, spotify_token_expires, spotify_refresh_token FROM users WHERE id = $1",
+      [req.user.id]
+    );
+    if (!rows.length || !rows[0].spotify_access_token) {
+      return res.status(401).json({ error: "Not connected" });
+    }
+    let token = rows[0].spotify_access_token;
+    if (new Date() > new Date(rows[0].spotify_token_expires)) {
+      token = await refreshSpotifyToken(rows[0].spotify_refresh_token, req.user.id);
+    }
+    const { deviceId, contextUri, trackUri } = req.body;
+    const body = contextUri ? { context_uri: contextUri } : { uris: [trackUri] };
+    await fetch("https://api.spotify.com/v1/me/player/play?device_id=" + deviceId, {
+      method: "PUT",
+      headers: {
+        Authorization: "Bearer " + token,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to play" });
+  }
+});
 module.exports = router;
