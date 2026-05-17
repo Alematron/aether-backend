@@ -1,5 +1,5 @@
 require("dotenv").config();
-const { pool } = require("./pool");
+const { pool } = require("../db/pool");
 
 async function addSpotifyColumns() {
   console.log("Adding Spotify columns...");
