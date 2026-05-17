@@ -37,7 +37,6 @@ router.get("/:handle", optionalAuth, async (req, res, next) => {
 });
 
 // ── PATCH /api/users/me ────────────────────────────────────────────────────
-// ── PATCH /api/users/me ────────────────────────────────────────────────────
 router.patch("/me",
   authenticate,
   [
