@@ -6,37 +6,29 @@ const { findSimilarUsers } = require("../services/recommender");
 
 const router = express.Router();
 
-// ── GET /api/users/:handle ─────────────────────────────────────────────────
-router.get("/:handle", optionalAuth, async (req, res, next) => {
+router.get("/me/notifications", authenticate, async (req, res, next) => {
   try {
     const { rows } = await query(
-      `SELECT id, handle, display_name, bio, avatar_key, banner_key,
-              theme, badge, follower_count, following_count, post_count,
-              created_at, is_pseudonymous,
-              CASE WHEN hide_activity THEN NULL ELSE last_seen_at END AS last_seen_at
-       FROM users
-       WHERE handle = $1 AND is_active = true AND is_banned = false`,
-      [req.params.handle]
+      `SELECT n.*, u.handle AS actor_handle, u.avatar_key AS actor_avatar
+       FROM notifications n
+       LEFT JOIN users u ON u.id = n.actor_id
+       WHERE n.user_id = $1
+       ORDER BY n.created_at DESC
+       LIMIT 50`,
+      [req.user.id]
     );
-    if (!rows.length) return res.status(404).json({ error: "User not found" });
-
-    const user = rows[0];
-
-    // Add viewer context
-    if (req.user && req.user.id !== user.id) {
-      const [followRow, blockRow] = await Promise.all([
-        query(`SELECT 1 FROM follows WHERE follower_id=$1 AND followee_id=$2`, [req.user.id, user.id]),
-        query(`SELECT 1 FROM blocks WHERE blocker_id=$1 AND blocked_id=$2`, [req.user.id, user.id]),
-      ]);
-      user.viewerFollows = !!followRow.rows.length;
-      user.viewerBlocked = !!blockRow.rows.length;
-    }
-
-    res.json(user);
+    query(`UPDATE notifications SET is_read=true WHERE user_id=$1 AND is_read=false`, [req.user.id]).catch(() => {});
+    res.json(rows);
   } catch (err) { next(err); }
 });
 
-// ── PATCH /api/users/me ────────────────────────────────────────────────────
+router.get("/me/similar", authenticate, async (req, res, next) => {
+  try {
+    const users = await findSimilarUsers(req.user.id);
+    res.json(users);
+  } catch (err) { next(err); }
+});
+
 router.patch("/me",
   authenticate,
   [
@@ -99,27 +91,36 @@ router.patch("/me",
     } catch (err) { next(err); }
   }
 );
-      // Build SET clause dynamically from provided fields only
-      const updates = Object.entries(fields)
-        .filter(([, v]) => v !== undefined)
-        .map(([k], i) => `${k} = $${i + 2}`);
 
-      if (!updates.length) return res.status(400).json({ error: "No fields to update" });
+router.get("/:handle", optionalAuth, async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT id, handle, display_name, bio, avatar_key, banner_key,
+              theme, badge, follower_count, following_count, post_count,
+              created_at, is_pseudonymous,
+              room_theme, room_wallpaper_key, room_accent_color, room_mood, room_mood_emoji,
+              CASE WHEN hide_activity THEN NULL ELSE last_seen_at END AS last_seen_at
+       FROM users
+       WHERE handle = $1 AND is_active = true AND is_banned = false`,
+      [req.params.handle]
+    );
+    if (!rows.length) return res.status(404).json({ error: "User not found" });
 
-      const values = Object.values(fields).filter(v => v !== undefined);
-      const { rows } = await query(
-        `UPDATE users SET ${updates.join(", ")} WHERE id = $1
-         RETURNING id, handle, display_name, bio, theme, avatar_key, banner_key,
-                   is_pseudonymous, hide_activity, hide_location, e2e_enabled, data_minimize`,
-        [req.user.id, ...values]
-      );
+    const user = rows[0];
 
-      res.json(rows[0]);
-    } catch (err) { next(err); }
-  }
-);
+    if (req.user && req.user.id !== user.id) {
+      const [followRow, blockRow] = await Promise.all([
+        query(`SELECT 1 FROM follows WHERE follower_id=$1 AND followee_id=$2`, [req.user.id, user.id]),
+        query(`SELECT 1 FROM blocks WHERE blocker_id=$1 AND blocked_id=$2`, [req.user.id, user.id]),
+      ]);
+      user.viewerFollows = !!followRow.rows.length;
+      user.viewerBlocked = !!blockRow.rows.length;
+    }
 
-// ── GET /api/users/:handle/posts ───────────────────────────────────────────
+    res.json(user);
+  } catch (err) { next(err); }
+});
+
 router.get("/:handle/posts", optionalAuth, async (req, res, next) => {
   try {
     const { rows: userRows } = await query(
@@ -147,7 +148,6 @@ router.get("/:handle/posts", optionalAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ── POST /api/users/:handle/follow ─────────────────────────────────────────
 router.post("/:handle/follow", authenticate, async (req, res, next) => {
   try {
     const { rows: targetRows } = await query(
@@ -163,7 +163,6 @@ router.post("/:handle/follow", authenticate, async (req, res, next) => {
     );
 
     if (existing.rows.length) {
-      // Unfollow
       await transaction(async (client) => {
         await client.query(`DELETE FROM follows WHERE follower_id=$1 AND followee_id=$2`, [req.user.id, targetId]);
         await client.query(`UPDATE users SET follower_count = GREATEST(follower_count-1,0) WHERE id=$1`, [targetId]);
@@ -172,7 +171,6 @@ router.post("/:handle/follow", authenticate, async (req, res, next) => {
       return res.json({ following: false });
     }
 
-    // Follow
     await transaction(async (client) => {
       await client.query(
         `INSERT INTO follows (follower_id, followee_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`,
@@ -190,7 +188,6 @@ router.post("/:handle/follow", authenticate, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ── POST /api/users/:handle/block ──────────────────────────────────────────
 router.post("/:handle/block", authenticate, async (req, res, next) => {
   try {
     const { rows: targetRows } = await query(
@@ -213,37 +210,10 @@ router.post("/:handle/block", authenticate, async (req, res, next) => {
         `INSERT INTO blocks (blocker_id, blocked_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`,
         [req.user.id, targetId]
       );
-      // Also unfollow both directions
       await client.query(`DELETE FROM follows WHERE (follower_id=$1 AND followee_id=$2) OR (follower_id=$2 AND followee_id=$1)`, [req.user.id, targetId]);
     });
 
     res.json({ blocked: true });
-  } catch (err) { next(err); }
-});
-
-// ── GET /api/users/me/notifications ───────────────────────────────────────
-router.get("/me/notifications", authenticate, async (req, res, next) => {
-  try {
-    const { rows } = await query(
-      `SELECT n.*, u.handle AS actor_handle, u.avatar_key AS actor_avatar
-       FROM notifications n
-       LEFT JOIN users u ON u.id = n.actor_id
-       WHERE n.user_id = $1
-       ORDER BY n.created_at DESC
-       LIMIT 50`,
-      [req.user.id]
-    );
-    // Mark all as read
-    query(`UPDATE notifications SET is_read=true WHERE user_id=$1 AND is_read=false`, [req.user.id]).catch(() => {});
-    res.json(rows);
-  } catch (err) { next(err); }
-});
-
-// ── GET /api/users/me/similar ─────────────────────────────────────────────
-router.get("/me/similar", authenticate, async (req, res, next) => {
-  try {
-    const users = await findSimilarUsers(req.user.id);
-    res.json(users);
   } catch (err) { next(err); }
 });
 
