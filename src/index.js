@@ -107,6 +107,7 @@ const communityRoutes = require("./routes/communities");
 const mediaRoutes = require("./routes/media");
 const remixRoutes = require("./routes/remixes");
 const discoverRoutes = require("./routes/discover");
+const spotifyRoutes = require("./routes/spotify");
 
 app.get("/health", (req, res) => {
   res.json({
@@ -124,6 +125,7 @@ app.use("/api/communities", communityRoutes);
 app.use("/api/media", mediaRoutes);
 app.use("/api/remixes", remixRoutes);
 app.use("/api/discover", discoverRoutes);
+app.use("/api/spotify", spotifyRoutes);
 
 // ─────────────────────────────────────────────
 // ERROR HANDLER (LAST)
