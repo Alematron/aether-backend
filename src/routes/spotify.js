@@ -157,9 +157,13 @@ router.get("/playlists", authenticate, async (req, res) => {
       token = await refreshSpotifyToken(rows[0].spotify_refresh_token, req.user.id);
     }
     const response = await fetch("https://api.spotify.com/v1/me/playlists?limit=20", {
-      headers: { Authorization: "Bearer " + token },
+      headers: { 
+        Authorization: "Bearer " + token,
+        'Cache-Control': 'no-cache',
+      },
     });
     const data = await response.json();
+    res.setHeader('Cache-Control', 'no-store');
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch playlists" });
