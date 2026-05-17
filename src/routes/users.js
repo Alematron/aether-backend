@@ -37,6 +37,7 @@ router.get("/:handle", optionalAuth, async (req, res, next) => {
 });
 
 // ── PATCH /api/users/me ────────────────────────────────────────────────────
+// ── PATCH /api/users/me ────────────────────────────────────────────────────
 router.patch("/me",
   authenticate,
   [
@@ -50,6 +51,11 @@ router.patch("/me",
     body("hideLocation").optional().isBoolean(),
     body("e2eEnabled").optional().isBoolean(),
     body("dataMinimize").optional().isBoolean(),
+    body("roomTheme").optional().isString().isLength({ max: 64 }),
+    body("roomWallpaperKey").optional().isString(),
+    body("roomAccentColor").optional().isString().isLength({ max: 16 }),
+    body("roomMood").optional().isString().isLength({ max: 128 }),
+    body("roomMoodEmoji").optional().isString().isLength({ max: 8 }),
   ],
   async (req, res, next) => {
     try {
@@ -57,18 +63,43 @@ router.patch("/me",
       if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
       const fields = {
-        display_name:    req.body.displayName,
-        bio:             req.body.bio,
-        theme:           req.body.theme,
-        avatar_key:      req.body.avatarKey,
-        banner_key:      req.body.bannerKey,
-        is_pseudonymous: req.body.isPseudonymous,
-        hide_activity:   req.body.hideActivity,
-        hide_location:   req.body.hideLocation,
-        e2e_enabled:     req.body.e2eEnabled,
-        data_minimize:   req.body.dataMinimize,
+        display_name:       req.body.displayName,
+        bio:                req.body.bio,
+        theme:              req.body.theme,
+        avatar_key:         req.body.avatarKey,
+        banner_key:         req.body.bannerKey,
+        is_pseudonymous:    req.body.isPseudonymous,
+        hide_activity:      req.body.hideActivity,
+        hide_location:      req.body.hideLocation,
+        e2e_enabled:        req.body.e2eEnabled,
+        data_minimize:      req.body.dataMinimize,
+        room_theme:         req.body.roomTheme,
+        room_wallpaper_key: req.body.roomWallpaperKey,
+        room_accent_color:  req.body.roomAccentColor,
+        room_mood:          req.body.roomMood,
+        room_mood_emoji:    req.body.roomMoodEmoji,
       };
 
+      const updates = Object.entries(fields)
+        .filter(function(entry) { return entry[1] !== undefined; })
+        .map(function(entry, i) { return entry[0] + ' = $' + (i + 2); });
+
+      if (!updates.length) return res.status(400).json({ error: "No fields to update" });
+
+      const values = Object.values(fields).filter(function(v) { return v !== undefined; });
+
+      const { rows } = await query(
+        'UPDATE users SET ' + updates.join(', ') + ' WHERE id = $1 ' +
+        'RETURNING id, handle, display_name, bio, theme, avatar_key, banner_key, ' +
+        'is_pseudonymous, hide_activity, hide_location, e2e_enabled, data_minimize, ' +
+        'room_theme, room_wallpaper_key, room_accent_color, room_mood, room_mood_emoji',
+        [req.user.id, ...values]
+      );
+
+      res.json(rows[0]);
+    } catch (err) { next(err); }
+  }
+);
       // Build SET clause dynamically from provided fields only
       const updates = Object.entries(fields)
         .filter(([, v]) => v !== undefined)
