@@ -47,6 +47,7 @@ router.patch("/me",
     body("roomAccentColor").optional().isString().isLength({ max: 16 }),
     body("roomMood").optional().isString().isLength({ max: 128 }),
     body("roomMoodEmoji").optional().isString().isLength({ max: 8 }),
+    body("roomAutoplay").optional().isIn(["none", "vinyl", "spotify"]),
   ],
   async (req, res, next) => {
     try {
@@ -69,6 +70,7 @@ router.patch("/me",
         room_accent_color:  req.body.roomAccentColor,
         room_mood:          req.body.roomMood,
         room_mood_emoji:    req.body.roomMoodEmoji,
+        room_autoplay: req.body.roomAutoplay,
       };
 
       const updates = Object.entries(fields)
@@ -80,12 +82,13 @@ router.patch("/me",
       const values = Object.values(fields).filter(function(v) { return v !== undefined; });
 
       const { rows } = await query(
-        'UPDATE users SET ' + updates.join(', ') + ' WHERE id = $1 ' +
-        'RETURNING id, handle, display_name, bio, theme, avatar_key, banner_key, ' +
-        'is_pseudonymous, hide_activity, hide_location, e2e_enabled, data_minimize, ' +
-        'room_theme, room_wallpaper_key, room_accent_color, room_mood, room_mood_emoji',
-        [req.user.id, ...values]
-      );
+  'UPDATE users SET ' + updates.join(', ') + ' WHERE id = $1 ' +
+  'RETURNING id, handle, display_name, bio, theme, avatar_key, banner_key, ' +
+  'is_pseudonymous, hide_activity, hide_location, e2e_enabled, data_minimize, ' +
+  'room_theme, room_wallpaper_key, room_accent_color, room_mood, room_mood_emoji, ' +
+  'room_autoplay',
+  [req.user.id, ...values]
+);
 
       res.json(rows[0]);
     } catch (err) { next(err); }
