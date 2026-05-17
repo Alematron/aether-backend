@@ -6,7 +6,7 @@ const router = express.Router();
 
 const SPOTIFY_AUTH_URL = "https://accounts.spotify.com/authorize";
 const SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token";
-const SCOPES = "user-read-currently-playing user-read-recently-played user-read-playback-state streaming user-read-email user-read-private";
+const SCOPES = "user-read-currently-playing user-read-recently-played user-read-playback-state streaming user-read-email user-read-private playlist-read-private playlist-read-collaborative";
 
 router.get("/login", authenticate, (req, res) => {
   const params = new URLSearchParams({
